@@ -1,14 +1,16 @@
-FROM python:3.8-slim
-WORKDIR /app
+FROM python:3.9-slim
+
+# Установка переменной окружения для Flask
 ENV FLASK_APP=app.py
-ENV FLASK_RUN_HOST=0.0.0.0
 
-# Установка зависимостей
-COPY requirements.txt requirements.txt
-RUN pip install -r requirements.txt
+# Установка рабочей директории
+WORKDIR /app
 
-# Копирование файлов приложения
+# Копирование всех остальных файлов приложения
 COPY . .
 
+# Копирование requirements.txt и установка зависимостей
+RUN pip install --no-cache-dir -r requirements.txt
+
 # Запуск приложения
-CMD ["flask", "run"]
+CMD ["flask", "run", "--host=0.0.0.0", "--port=5000"]
