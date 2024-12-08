@@ -1,61 +1,44 @@
+
+import os
 from flask import Flask, request
+from datetime import datetime
 import psycopg2
 from psycopg2 import sql
-from datetime import datetime
 
 app = Flask(__name__)
 
+# Получение URL базы данных из переменных окружения
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://user:password@localhost:5432/counter_db")
+
 # Подключение к базе данных
-def get_db_connection():
-    connection = psycopg2.connect(
-        host="db",
-        database="counter_db",
-        user="postgres",
-        password="postgres"
-    )
-    return connection
+conn = psycopg2.connect(DATABASE_URL)
 
-# Создание таблицы, если её еще нет
-def create_table():
-    connection = get_db_connection()
-    cursor = connection.cursor()
+# Создание таблицы, если она не существует
+with conn.cursor() as cursor:
     cursor.execute("""
-        CREATE TABLE IF NOT EXISTS counter (
+        CREATE TABLE IF NOT EXISTS table_counter (
             id SERIAL PRIMARY KEY,
-            datetime TIMESTAMP,
-            client_info TEXT
-        )
+            datetime TIMESTAMP NOT NULL,
+            client_info TEXT NOT NULL
+        );
     """)
-    connection.commit()
-    cursor.close()
-    connection.close()
-
-create_table()
+    conn.commit()
 
 @app.route('/')
-def hello():
-    connection = get_db_connection()
-    cursor = connection.cursor()
-    
-    # Получаем текущее время и информацию о клиенте
-    current_time = datetime.now()
-    client_info = request.headers.get('User-Agent')
-    
-    # Вставляем данные в таблицу
-    cursor.execute(
-        sql.SQL("INSERT INTO counter (datetime, client_info) VALUES (%s, %s)"),
-        [current_time, client_info]
-    )
-    connection.commit()
-    
-    # Подсчитываем количество посещений
-    cursor.execute("SELECT COUNT(*) FROM counter")
-    count = cursor.fetchone()[0]
-    
-    cursor.close()
-    connection.close()
-    
-    return f'Hello World! I have been seen {count} times.\n'
+def counter():
+    user_agent = request.headers.get('User-Agent')
+    timestamp = datetime.now()
 
-if __name__ == '__main__':
-    app.run(host="0.0.0.0")
+    # Сохранение данных о запросе в базу данных
+    with conn.cursor() as cursor:
+        insert_query = sql.SQL("""
+            INSERT INTO table_counter (datetime, client_info)
+            VALUES (%s, %s);
+        """)
+        cursor.execute(insert_query, (timestamp, user_agent))
+        conn.commit()
+
+    return f"Request saved at {timestamp} with client info: {user_agent}"
+
+if __name__ == "__main__":
+    app.run(host='0.0.0.0', port=5000)
